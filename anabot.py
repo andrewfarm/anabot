@@ -1,19 +1,20 @@
 import pytumblr
 import random
 from pprint import pprint
+import keys
 
 arFilename = 'already-reblogged.txt'
 appendARFile = open(arFilename, 'a+')
-alreadyReblogged = [int(line.strip()) for line in open(arFilename, 'r').readlines()]
+readARFile = open(arFilename, 'r')
+alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
+readARFile.close()
 
-words = [line.strip() for line in open('google-10000-english.txt', 'r').readlines()]
+wordsFilename = 'google-10000-english.txt'
+wordsFile = open(wordsFilename, 'r')
+words = [line.strip() for line in wordsFile.readlines()]
+wordsFile.close()
 
-client = pytumblr.TumblrRestClient(
-        'LkT11cAo6H3kzdyQNJjiZCN317gFqLMmS9W43B6bu76navX25y',
-        'V1XErxXXpRDVFk5g3q4isV85WXOu35BYIPhDdynuuH41vRAW64',
-        'TT0KiCPdiAnFjcaqtJJfCtD9aspk02ocdT2gyHlQ1JVLMiXS9Q',
-        'YkDazbHweTEG0inZBMTPkfardgBoldAhjq2xLFUDeRMxYMh5un'
-        )
+client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
 
 def wordFits(word, textLetters):
         textLetters = list(textLetters) #make a copy of the text
@@ -61,3 +62,5 @@ def ana(post):
 #postToReblog = random.choice(client.tagged('shitpost', filter='text'))
 for post in client.tagged('shitpost', filter='text'):
         print ana(post)
+
+appendARFile.close()
