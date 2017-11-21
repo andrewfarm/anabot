@@ -2,7 +2,11 @@ import pytumblr
 import random
 from pprint import pprint
 
-words = [line.strip() for line in open('google-10000-english.txt').readlines()]
+arFilename = 'already-reblogged.txt'
+appendARFile = open(arFilename, 'a+')
+alreadyReblogged = [int(line.strip()) for line in open(arFilename, 'r').readlines()]
+
+words = [line.strip() for line in open('google-10000-english.txt', 'r').readlines()]
 
 client = pytumblr.TumblrRestClient(
         'LkT11cAo6H3kzdyQNJjiZCN317gFqLMmS9W43B6bu76navX25y',
@@ -25,10 +29,13 @@ def reblog(post, reblogComment):
 
 '''Returns True if Ana was successful, False if she wasn't'''
 def ana(post):
+        if post['id'] in alreadyReblogged:
+                print 'Already reblogged'
+                return False
         if not 'body' in post:
                 print 'No body attribute'
                 return False
-        print postToReblog['body']
+        print post['body']
         postLetters = [c for c in post['body'].lower() if c.isalpha()]
         if (len(postLetters) < 10) or (len(postLetters) > 60):
                 print 'Too short or long'
@@ -45,9 +52,12 @@ def ana(post):
                         reblogComment = ' '.join(anagram)
                         print reblogComment
                         reblog(post, reblogComment)
+                        alreadyReblogged.append(post['id']);
+                        appendARFile.write('%d\n' % post['id'])
                         return True
         print '404 Anagram not found'
         return False
 
-postToReblog = random.choice(client.tagged('shitpost', filter='text'))
-print ana(postToReblog)
+#postToReblog = random.choice(client.tagged('shitpost', filter='text'))
+for post in client.tagged('shitpost', filter='text'):
+        print ana(post)
