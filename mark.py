@@ -16,21 +16,21 @@ def sortedIndex(list, elem, startIndex=None, endIndex=None):
         else:
                 return sortedIndex(list, elem, pivotIndex + 1, endIndex)
 
-def insertIntoSorted(list, elem, startIndex=None, endIndex=None):
-        if startIndex is None:
-                startIndex = 0
-        if endIndex is None:
-                endIndex = len(list) - 1
-        if endIndex < startIndex:
-                list.insert(startIndex, elem)
-        else:
-                pivotIndex = int((startIndex + endIndex) / 2)
-                if elem == list[pivotIndex]:
-                        list.insert(pivotIndex + 1, elem)
-                elif elem < list[pivotIndex]:
-                        insertIntoSorted(list, elem, startIndex, pivotIndex - 1)
-                else:
-                        insertIntoSorted(list, elem, pivotIndex + 1, endIndex)
+#def insertIntoSorted(list, elem, startIndex=None, endIndex=None):
+#        if startIndex is None:
+#                startIndex = 0
+#        if endIndex is None:
+#                endIndex = len(list) - 1
+#        if endIndex < startIndex:
+#                list.insert(startIndex, elem)
+#        else:
+#                pivotIndex = int((startIndex + endIndex) / 2)
+#                if elem == list[pivotIndex]:
+#                        list.insert(pivotIndex + 1, elem)
+#                elif elem < list[pivotIndex]:
+#                        insertIntoSorted(list, elem, startIndex, pivotIndex - 1)
+#                else:
+#                        insertIntoSorted(list, elem, pivotIndex + 1, endIndex)
 
 def uniq(sortedList):
         u = []
@@ -50,19 +50,16 @@ def buildMarkov(text):
         symbols = uniq(sortedText)
         
         print 'Building successive symbol list'
-        
-        #create list of empty lists
         freqs = []
         for i in xrange(len(symbols)):
-                freqs.append([])
-        #populate successive symbol list
+                freqs.append({})
         for i in xrange(len(textAsSymbols) - 1):
                 symbolIndex = sortedIndex(symbols, textAsSymbols[i])
-                freqIndex = sortedIndex(freqs[symbolIndex], textAsSymbols[i+1])
-                if freqIndex < 0:
-                        insertIntoSorted(freqs[symbolIndex], [textAsSymbols[i+1], 1])
+                nextSymbol = textAsSymbols[i+1]
+                if nextSymbol in freqs[symbolIndex]:
+                        freqs[symbolIndex][nextSymbol] += 1
                 else:
-                        freqs[symbolIndex][freqIndex]['freq'] += 1
+                        freqs[symbolIndex][nextSymbol] = 1
         print 'Done'
         markov = {'symbols': symbols, 'freqs': freqs}
         return markov
