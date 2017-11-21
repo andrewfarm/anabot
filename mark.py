@@ -22,11 +22,11 @@ def insertIntoSorted(list, elem, startIndex=None, endIndex=None):
         if endIndex is None:
                 endIndex = len(list) - 1
         if endIndex < startIndex:
-                list.insert(elem, startIndex)
+                list.insert(startIndex, elem)
         else:
                 pivotIndex = int((startIndex + endIndex) / 2)
                 if elem == list[pivotIndex]:
-                        list.insert(elem, pivotIndex + 1)
+                        list.insert(pivotIndex + 1, elem)
                 elif elem < list[pivotIndex]:
                         insertIntoSorted(list, elem, startIndex, pivotIndex - 1)
                 else:
@@ -52,16 +52,19 @@ def buildMarkov(text):
         print 'Building successive symbol list'
         
         #create list of empty lists
-        strings = []
+        freqs = []
         for i in xrange(len(symbols)):
-                strings.append([])
+                freqs.append([])
         #populate successive symbol list
         for i in xrange(len(textAsSymbols) - 1):
                 symbolIndex = sortedIndex(symbols, textAsSymbols[i])
-                strings[symbolIndex].append(textAsSymbols[i+1])
-
+                freqIndex = sortedIndex(freqs[symbolIndex], textAsSymbols[i+1])
+                if freqIndex < 0:
+                        insertIntoSorted(freqs[symbolIndex], [textAsSymbols[i+1], 1])
+                else:
+                        freqs[symbolIndex][freqIndex]['freq'] += 1
         print 'Done'
-        markov = {'symbols': symbols, 'next': strings}
+        markov = {'symbols': symbols, 'freqs': freqs}
         return markov
 
 inFilename = 'gutenberg-mobydick.txt'
