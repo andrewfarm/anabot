@@ -3,7 +3,7 @@ import json
 
 def buildMarkov(text):
         print 'Splitting text'
-        textAsSymbols = re.split(r'\s+', text.lower())
+        textAsSymbols = re.split(r'\s+', text)
         print 'Building unique symbol dictionary'
         chain = {}
         for s in textAsSymbols:
