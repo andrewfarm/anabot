@@ -5,35 +5,18 @@ import keys
 import json
 import re
 
-arFilename = 'already-reblogged.txt'
-appendARFile = open(arFilename, 'a+')
-readARFile = open(arFilename, 'r')
-alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
-readARFile.close()
-
-wordsFilename = 'google-10000-english.txt'
-wordsFile = open(wordsFilename, 'r')
-words = [line.strip() for line in wordsFile.readlines()]
-wordsFile.close()
-
-markovChainFilename = 'mark.json'
-markovChainFile = open(markovChainFilename, 'r')
-markovChainJSON = markovChainFile.read()
-markovChainFile.close()
-markovChain = json.loads(markovChainJSON)
-
-def wordFits(word, textLetters):
+'''Returns a copy of textLetters with the letters in word each removed once,
+   or None if not all the letters in word exist in textLetters'''
+def removeWord(word, textLetters):
         textLetters = list(textLetters) #make a copy of the text
         for letter in word:
                 if letter in textLetters:
                         textLetters.remove(letter)
                 else:
-                        return False
-        return True
+                        return None
+        return textLetters
 
-def reblog(post, reblogComment):
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], state='published', comment=reblogComment + '<br><br>Hi guys! I\'m a bot! I\'m in development right now so I don\'t really know what I\'m doing<br><br><span style="font-size: 10pt;"><em>- Anagram robot 0.0</em></span>')
-
+'''Chooses a random state from the states in nextDict based on their frequencies'''
 def randNext(nextDict):
         totalFreq = 0
         for next in nextDict:
@@ -45,15 +28,64 @@ def randNext(nextDict):
                 if cumulativeFreq >= rand:
                         return next
 
-def createAnagram(letters):
-        curr = random.choice(markovChain.keys())
-        anagram = curr[0].upper() + curr[1:]
-        i = 0
-        while (i < 30) or not (curr.endswith('.') or curr.endswith('!') or curr.endswith('?') ):
-                curr = randNext(markovChain[curr])
-                anagram += ' ' + curr
-                i += 1
-        return anagram
+def clean(symbol):
+        return ''.join([l for l in symbol.lower() if l.isalpha()])
+
+def createAnagram(letters, chain, curr=None, recursion=1):
+        if curr is None:
+                alreadyTried = {}
+                numTried = 0
+                chainSize = len(chain)
+                remainingLetters = None
+                rest = None
+                while (True):
+                        curr = random.choice(chain.keys())
+                        if not curr in alreadyTried:
+                                alreadyTried[curr] = True
+                                numTried += 1
+                                cleanedCurr = clean(curr)
+                                remainingLetters = removeWord(cleanedCurr, letters)
+                                if remainingLetters is not None:
+                                        percentTried = int(100 * numTried / chainSize)
+                                        print '%d: %s' % (percentTried, curr)
+                                        if len(remainingLetters) == 0:
+                                                return curr[0].upper() + curr[1:]
+                                        rest = createAnagram(remainingLetters, chain, curr, recursion=recursion+1)
+                                        if rest is not None:
+                                                return curr[0].upper() + curr[1:] + ' ' + rest
+                        if len(alreadyTried) == len(chain):
+                                return None
+        else:
+                freqs = chain[curr].copy()
+                while (True):
+                        next = randNext(freqs)
+                        freqs.pop(next)
+                        cleanedNext = clean(next)
+                        remainingLetters = removeWord(cleanedNext, letters)
+                        if remainingLetters is not None:
+                                if len(remainingLetters) == 0:
+                                        return next
+                                rest = createAnagram(remainingLetters, chain, next, recursion=recursion+1)
+                                if rest is not None:
+                                        return next + ' ' + rest
+                        if len(freqs) == 0:
+                                return None
+                return 'END'
+
+arFilename = 'already-reblogged.txt'
+appendARFile = open(arFilename, 'a+')
+readARFile = open(arFilename, 'r')
+alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
+readARFile.close()
+
+markovChainFilename = 'mark.json'
+markovChainFile = open(markovChainFilename, 'r')
+markovChainJSON = markovChainFile.read()
+markovChainFile.close()
+markovChain = json.loads(markovChainJSON)
+
+def reblog(post, reblogComment):
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot 0.0. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
 
 '''Returns True if Ana was successful, False if she wasn't'''
 def ana(post):
@@ -69,11 +101,11 @@ def ana(post):
                 print 'Too short or long'
                 return False
         
-        anagram = createAnagram(postLetters)
-        if len(anagram) > 0:
-#                reblog(post, anagram)
-#                alreadyReblogged.append(post['id']);
-#                appendARFile.write('%d\n' % post['id'])
+        anagram = createAnagram(postLetters, markovChain)
+        if anagram is not None:
+                reblog(post, anagram)
+                alreadyReblogged.append(post['id']);
+                appendARFile.write('%d\n' % post['id'])
                 print anagram
                 return True
 
