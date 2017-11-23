@@ -1,11 +1,17 @@
 import re
 import json
+import sys
 
-def buildMarkov(text):
+def hasalpha(text):
+        for l in text:
+                if l.isalpha():
+                        return True
+        return False
+
+def buildMarkov(text, chain={}):
         print 'Splitting text'
-        textAsSymbols = re.split(r'\s+', text)
+        textAsSymbols = [symbol for symbol in re.split(r'\s+', text) if hasalpha(symbol)]
         print 'Building unique symbol dictionary'
-        chain = {}
         for s in textAsSymbols:
                 if not s in chain:
                         chain[s] = {}
@@ -21,11 +27,20 @@ def buildMarkov(text):
         print 'Done'
         return chain
 
-inFilename = 'gutenberg-mobydick.txt'
-inf = open(inFilename, 'r')
+if len(sys.argv) < 2:
+        print 'Expected filename'
+        sys.exit(1)
+inf = open(sys.argv[1], 'r')
 text = inf.read()
 inf.close()
 
+try:
+        chainf = open('mark.json', 'r')
+        chain = json.loads(chainf.read())
+        chainf.close()
+except:
+        chain = {}
+
 outf = open('mark.json', 'w+')
-outf.write(json.dumps(buildMarkov(text)))
+outf.write(json.dumps(buildMarkov(text, chain)))
 outf.close()

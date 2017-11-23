@@ -32,6 +32,7 @@ def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
 def createAnagram(letters, chain, curr=None, recursion=1):
+#        print 'recursion: %d\t%s' % (recursion, curr)
         if curr is None:
                 alreadyTried = {}
                 numTried = 0
