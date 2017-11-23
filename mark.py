@@ -28,7 +28,7 @@ def buildMarkov(text, chain={}):
         return chain
 
 if len(sys.argv) < 2:
-        print 'Expected filename'
+        print 'Usage: mark.py <filename>'
         sys.exit(1)
 inf = open(sys.argv[1], 'r')
 text = inf.read()

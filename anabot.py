@@ -5,6 +5,8 @@ import keys
 import json
 import re
 
+version = '0.0'
+
 '''Returns a copy of textLetters with the letters in word each removed once,
    or None if not all the letters in word exist in textLetters'''
 def removeWord(word, textLetters):
@@ -74,7 +76,6 @@ def createAnagram(letters, chain, curr=None, recursion=1):
                 return 'END'
 
 arFilename = 'already-reblogged.txt'
-appendARFile = open(arFilename, 'a+')
 readARFile = open(arFilename, 'r')
 alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
 readARFile.close()
@@ -86,7 +87,11 @@ markovChainFile.close()
 markovChain = json.loads(markovChainJSON)
 
 def reblog(post, reblogComment):
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot 0.0. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
+        alreadyReblogged.append(post['id']);
+        appendARFile = open(arFilename, 'a+')
+        appendARFile.write('%d\n' % post['id'])
+        appendARFile.close()
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
 
 '''Returns True if Ana was successful, False if she wasn't'''
 def ana(post):
@@ -105,8 +110,6 @@ def ana(post):
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
                 reblog(post, anagram)
-                alreadyReblogged.append(post['id']);
-                appendARFile.write('%d\n' % post['id'])
                 print anagram
                 return True
 
@@ -119,7 +122,6 @@ tags = [
         'supernatural',
         'doctorwho',
         'sherlock',
-        'avengers',
         'college',
         'idea',
         'lifehack',
@@ -129,5 +131,3 @@ tags = [
 client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
 for post in client.tagged(random.choice(tags), filter='text'):
         print ana(post)
-
-appendARFile.close()
