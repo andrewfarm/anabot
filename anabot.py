@@ -112,8 +112,21 @@ def ana(post):
         print '404 Anagram not found'
         return False
 
+tags = [
+        'shitpost',
+        'showerthoughts',
+        'supernatural',
+        'doctorwho',
+        'sherlock',
+        'avengers',
+        'college',
+        'idea',
+        'lifehack',
+        'lifehacks'
+]
+
 client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
-for post in client.tagged('shitpost', filter='text'):
+for post in client.tagged(random.choice(tags), filter='text'):
         print ana(post)
 
 appendARFile.close()
