@@ -87,6 +87,8 @@ def createAnagram(letters, chain, curr=None, recursion=1):
                 return 'END'
 
 arFilename = 'already-reblogged.txt'
+createARFile = open(arFilename, 'a+')
+createARFile.close()
 readARFile = open(arFilename, 'r')
 alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
 readARFile.close()
