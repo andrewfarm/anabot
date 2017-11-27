@@ -4,6 +4,14 @@ from pprint import pprint
 import keys
 import json
 import re
+from multiprocessing import Process
+import time
+from ssl import SSLError
+import sys
+
+postLimitShort = 10
+postLimitLong = 30
+timeout = 60
 
 version = '0.0'
 
@@ -105,7 +113,7 @@ def ana(post):
                 return False
         print post['body']
         postLetters = [c for c in post['body'].lower() if c.isalpha()]
-        if (len(postLetters) < 10) or (len(postLetters) > 40):
+        if (len(postLetters) < postLimitShort) or (len(postLetters) > postLimitLong):
                 print 'Too short or long'
                 return False
         
@@ -118,8 +126,21 @@ def ana(post):
         print '404 Anagram not found'
         return False
 
-tag = clean(random.choice(markovChain.keys()))
-print 'Searching tag: ' + tag
-client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
-for post in client.tagged(tag, filter='text'):
-        print ana(post)
+try:
+        client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
+except:
+        print '!!! Could not connect to Tumblr. !!!'
+while True:
+        tag = clean(random.choice(markovChain.keys()))
+        print '===== Searching tag: ' + tag + ' ====='
+        try:
+                for post in client.tagged(tag, filter='text'):
+                        p = Process(target=ana, name='Ana', args=(post,))
+                        p.start()
+                        p.join(timeout)
+                        if p.is_alive():
+                                print 'Timed out'
+                                p.terminate()
+                                p.join()
+        except SSLError:
+                print 'Connection error'
