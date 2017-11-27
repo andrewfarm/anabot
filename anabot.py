@@ -14,7 +14,7 @@ postLimitLong = 30
 timeout = 60
 waitInterval = 20
 
-version = '0.0'
+version = '0.5'
 
 print '===== Starting Anabot v' + version + ' ====='
 
