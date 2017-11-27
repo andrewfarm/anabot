@@ -7,6 +7,8 @@ import re
 
 version = '0.0'
 
+print '===== Starting Anabot v' + version + ' ====='
+
 '''Returns a copy of textLetters with the letters in word each removed once,
    or None if not all the letters in word exist in textLetters'''
 def removeWord(word, textLetters):
@@ -62,7 +64,7 @@ def createAnagram(letters, chain, curr=None, recursion=1):
                 freqs = chain[curr].copy()
                 while (True):
                         next = randNext(freqs)
-                        freqs.pop(next)
+                        freqs.pop(next, None) #TODO next sometimes not found in freqs
                         cleanedNext = clean(next)
                         remainingLetters = removeWord(cleanedNext, letters)
                         if remainingLetters is not None:
@@ -91,7 +93,7 @@ def reblog(post, reblogComment):
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
 
 '''Returns True if Ana was successful, False if she wasn't'''
 def ana(post):
@@ -103,7 +105,7 @@ def ana(post):
                 return False
         print post['body']
         postLetters = [c for c in post['body'].lower() if c.isalpha()]
-        if (len(postLetters) < 10) or (len(postLetters) > 60):
+        if (len(postLetters) < 10) or (len(postLetters) > 40):
                 print 'Too short or long'
                 return False
         
@@ -116,18 +118,8 @@ def ana(post):
         print '404 Anagram not found'
         return False
 
-tags = [
-        'shitpost',
-        'showerthoughts',
-        'supernatural',
-        'doctorwho',
-        'sherlock',
-        'college',
-        'idea',
-        'lifehack',
-        'lifehacks'
-]
-
+tag = clean(random.choice(markovChain.keys()))
+print 'Searching tag: ' + tag
 client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
-for post in client.tagged(random.choice(tags), filter='text'):
+for post in client.tagged(tag, filter='text'):
         print ana(post)
