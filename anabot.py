@@ -6,12 +6,13 @@ import json
 import re
 from multiprocessing import Process
 import time
-from ssl import SSLError
+from requests.exceptions import SSLError
 import sys
 
 postLimitShort = 10
 postLimitLong = 30
 timeout = 60
+waitInterval = 0
 
 version = '0.0'
 
@@ -142,5 +143,6 @@ while True:
                                 print 'Timed out'
                                 p.terminate()
                                 p.join()
+                time.sleep(waitInterval)
         except SSLError:
                 print 'Connection error'
