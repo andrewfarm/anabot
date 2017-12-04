@@ -1,4 +1,4 @@
 already-reblogged.txt
 *.pyc
 text
-mark.json
+mark*.json

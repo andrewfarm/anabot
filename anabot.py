@@ -8,6 +8,7 @@ from multiprocessing import Process
 import time
 from requests.exceptions import SSLError
 import sys
+from copy import deepcopy
 
 postLimitShort = 10
 postLimitLong = 30
@@ -44,23 +45,28 @@ def randNext(nextDict):
 def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
-def createAnagram(letters, chain, curr=None, recursion=1):
-        if curr is None:
-                dict = chain.copy()
+def createAnagram(letters, chain, s1=None, s2=None, recursion=1):
+#        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
+        if (s1 is None) or (s2 is None):
+                dict = deepcopy(chain)
         else:
-                dict = chain[curr].copy()
+                dict = deepcopy(chain[s1][s2])
         while True:
-                if curr is None:
-                        next = random.choice(dict.keys())
+                if (s1 is None) or (s2 is None):
+                        nexts1 = random.choice(dict.keys())
+                        next = random.choice(dict[nexts1].keys())
+                        dict[nexts1].pop(next)
+                        if len(dict[nexts1]) == 0:
+                                dict.pop(nexts1)
                 else:
+                        nexts1 = s2
                         next = randNext(dict)
-                dict.pop(next, None)
-                cleanedNext = clean(next)
-                remainingLetters = removeWord(cleanedNext, letters)
+                        dict.pop(next)
+                remainingLetters = removeWord(clean(next), letters)
                 if remainingLetters is not None: #the word fits in the list letters
                         if len(remainingLetters) == 0: #base case: the word uses the last of the letters
                                 return next
-                        rest = createAnagram(remainingLetters, chain, next, recursion=recursion+1)
+                        rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion+1)
                         if rest is not None: #found an anagram!
                                 return next + ' ' + rest
                 if len(dict) == 0:
@@ -80,7 +86,7 @@ markovChainFile.close()
 markovChain = json.loads(markovChainJSON)
 
 def reblog(post, reblogComment):
-        alreadyReblogged.append(post['id']);
+        alreadyReblogged.append(post['id'])
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
