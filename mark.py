@@ -13,19 +13,19 @@ def hasalpha(text):
 def buildMarkov(text, chain={}):
         print '> Splitting text'
         textAsSymbols = [symbol for symbol in re.split(r'\s+', text) if hasalpha(symbol)]
-        print '> Building unique symbol dictionary'
-        for s in textAsSymbols:
-                if not s in chain:
-                        chain[s] = {}
-        
         print '> Building successive symbol dictionaries'
-        for i in xrange(len(textAsSymbols) - 1):
-                symbol = textAsSymbols[i]
-                nextSymbol = textAsSymbols[i+1]
-                if nextSymbol in chain[symbol]:
-                        chain[symbol][nextSymbol] += 1
+        for i in xrange(len(textAsSymbols) - 2):
+                s1 = textAsSymbols[i]
+                s2 = textAsSymbols[i+1]
+                next = textAsSymbols[i+2]
+                if not s1 in chain:
+                        chain[s1] = {}
+                if not s2 in chain[s1]:
+                        chain[s1][s2] = {}
+                if next in chain[s1][s2]:
+                        chain[s1][s2][next] += 1
                 else:
-                        chain[symbol][nextSymbol] = 1
+                        chain[s1][s2][next] = 1
         print '> Done'
         return chain
 
