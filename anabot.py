@@ -44,6 +44,17 @@ def randNext(nextDict):
 def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
+def continueAnagram(curr, letters):
+        cleanedCurr = clean(curr)
+        remainingLetters = removeWord(cleanedCurr, letters)
+        if remainingLetters is not None: #the word fits in the list letters
+                if len(remainingLetters) == 0: #base case: the word uses the last of the letters
+                        return curr
+                rest = createAnagram(remainingLetters, chain, curr, recursion=recursion+1)
+                if rest is not None: #found an anagram!
+                        return curr + ' ' + rest
+        return None
+
 def createAnagram(letters, chain, curr=None, recursion=1):
 #        print 'recursion: %d\t%s' % (recursion, curr)
         if curr is None:
@@ -57,16 +68,11 @@ def createAnagram(letters, chain, curr=None, recursion=1):
                         if not curr in alreadyTried:
                                 alreadyTried[curr] = True
                                 numTried += 1
-                                cleanedCurr = clean(curr)
-                                remainingLetters = removeWord(cleanedCurr, letters)
-                                if remainingLetters is not None:
-                                        percentTried = int(100 * numTried / chainSize)
-                                        print '%d: %s' % (percentTried, curr)
-                                        if len(remainingLetters) == 0:
-                                                return curr[0].upper() + curr[1:]
-                                        rest = createAnagram(remainingLetters, chain, curr, recursion=recursion+1)
-                                        if rest is not None:
-                                                return curr[0].upper() + curr[1:] + ' ' + rest
+#                                percentTried = int(100 * numTried / chainSize)
+#                                print '%d: %s' % (percentTried, curr)
+                                anagram = continueAnagram(curr, letters)
+                                        if anagram is not None:
+                                                return anagram
                         if len(alreadyTried) == len(chain):
                                 return None
         else:
@@ -74,14 +80,9 @@ def createAnagram(letters, chain, curr=None, recursion=1):
                 while (True):
                         next = randNext(freqs)
                         freqs.pop(next, None) #TODO next sometimes not found in freqs
-                        cleanedNext = clean(next)
-                        remainingLetters = removeWord(cleanedNext, letters)
-                        if remainingLetters is not None:
-                                if len(remainingLetters) == 0:
-                                        return next
-                                rest = createAnagram(remainingLetters, chain, next, recursion=recursion+1)
-                                if rest is not None:
-                                        return next + ' ' + rest
+                        anagram = continueAnagram(next, letters)
+                        if anagram is not None:
+                                return anagram
                         if len(freqs) == 0:
                                 return None
                 return 'END'
