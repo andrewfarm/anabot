@@ -37,6 +37,7 @@ def mark(filenames):
                 text = inf.read()
                 inf.close()
                 buildMarkov(text, chain);
+        print 'Writing markov chain'
         outf = open('mark.json', 'w+')
         outf.write(json.dumps(chain))
         outf.close()

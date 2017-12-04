@@ -10,15 +10,6 @@ from requests.exceptions import SSLError
 import sys
 from copy import deepcopy
 
-postLimitShort = 10
-postLimitLong = 30
-timeout = 60
-waitInterval = 0
-
-version = '0.5'
-
-print '===== Starting Anabot v' + version + ' ====='
-
 '''Returns a copy of textLetters with the letters in word each removed once,
    or None if not all the letters in word exist in textLetters'''
 def removeWord(word, textLetters):
@@ -72,6 +63,15 @@ def createAnagram(letters, chain, s1=None, s2=None, recursion=1):
                 if len(dict) == 0:
                         return None
 
+postLimitShort = 10
+postLimitLong = 30
+timeout = 60
+waitInterval = 0
+
+version = '0.6'
+
+print '===== Starting Anabot v' + version + ' ====='
+
 arFilename = 'already-reblogged.txt'
 createARFile = open(arFilename, 'a+')
 createARFile.close()
@@ -90,7 +90,7 @@ def reblog(post, reblogComment):
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t make much sense, but I\'m working on that!</small>')
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
 
 '''Returns True if Ana was successful, False if she wasn't'''
 def ana(post):
