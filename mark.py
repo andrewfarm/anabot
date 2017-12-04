@@ -1,6 +1,8 @@
 import re
 import json
 import sys
+from os import listdir
+from os.path import isfile, join
 
 def hasalpha(text):
         for l in text:
@@ -9,14 +11,14 @@ def hasalpha(text):
         return False
 
 def buildMarkov(text, chain={}):
-        print 'Splitting text'
+        print '> Splitting text'
         textAsSymbols = [symbol for symbol in re.split(r'\s+', text) if hasalpha(symbol)]
-        print 'Building unique symbol dictionary'
+        print '> Building unique symbol dictionary'
         for s in textAsSymbols:
                 if not s in chain:
                         chain[s] = {}
         
-        print 'Building successive symbol dictionaries'
+        print '> Building successive symbol dictionaries'
         for i in xrange(len(textAsSymbols) - 1):
                 symbol = textAsSymbols[i]
                 nextSymbol = textAsSymbols[i+1]
@@ -24,23 +26,24 @@ def buildMarkov(text, chain={}):
                         chain[symbol][nextSymbol] += 1
                 else:
                         chain[symbol][nextSymbol] = 1
-        print 'Done'
+        print '> Done'
         return chain
 
-if len(sys.argv) < 2:
-        print 'Usage: mark.py <filename>'
-        sys.exit(1)
-inf = open(sys.argv[1], 'r')
-text = inf.read()
-inf.close()
-
-try:
-        chainf = open('mark.json', 'r')
-        chain = json.loads(chainf.read())
-        chainf.close()
-except:
+def mark(filenames):
         chain = {}
+        for filename in filenames:
+                print 'Parsing ' + filename
+                inf = open(filename, 'r')
+                text = inf.read()
+                inf.close()
+                buildMarkov(text, chain);
+        outf = open('mark.json', 'w+')
+        outf.write(json.dumps(chain))
+        outf.close()
 
-outf = open('mark.json', 'w+')
-outf.write(json.dumps(buildMarkov(text, chain)))
-outf.close()
+if len(sys.argv) > 1:
+        dir = sys.argv[1]
+else:
+        dir = 'text'
+filenames = [join(dir, f) for f in listdir(dir) if isfile(join(dir, f))]
+mark(filenames)

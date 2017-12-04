@@ -12,7 +12,7 @@ import sys
 postLimitShort = 10
 postLimitLong = 30
 timeout = 60
-waitInterval = 20
+waitInterval = 0
 
 version = '0.5'
 
