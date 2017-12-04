@@ -45,46 +45,26 @@ def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
 def createAnagram(letters, chain, curr=None, recursion=1):
-#        print 'recursion: %d\t%s' % (recursion, curr)
         if curr is None:
-                alreadyTried = {}
-                numTried = 0
-                chainSize = len(chain)
-                remainingLetters = None
-                rest = None
-                while (True):
-                        curr = random.choice(chain.keys())
-                        if not curr in alreadyTried:
-                                alreadyTried[curr] = True
-                                numTried += 1
-                                cleanedCurr = clean(curr)
-                                remainingLetters = removeWord(cleanedCurr, letters)
-                                if remainingLetters is not None:
-                                        percentTried = int(100 * numTried / chainSize)
-                                        print '%d: %s' % (percentTried, curr)
-                                        if len(remainingLetters) == 0:
-                                                return curr[0].upper() + curr[1:]
-                                        rest = createAnagram(remainingLetters, chain, curr, recursion=recursion+1)
-                                        if rest is not None:
-                                                return curr[0].upper() + curr[1:] + ' ' + rest
-                        if len(alreadyTried) == len(chain):
-                                return None
+                dict = chain.copy()
         else:
-                freqs = chain[curr].copy()
-                while (True):
-                        next = randNext(freqs)
-                        freqs.pop(next, None) #TODO next sometimes not found in freqs
-                        cleanedNext = clean(next)
-                        remainingLetters = removeWord(cleanedNext, letters)
-                        if remainingLetters is not None:
-                                if len(remainingLetters) == 0:
-                                        return next
-                                rest = createAnagram(remainingLetters, chain, next, recursion=recursion+1)
-                                if rest is not None:
-                                        return next + ' ' + rest
-                        if len(freqs) == 0:
-                                return None
-                return 'END'
+                dict = chain[curr].copy()
+        while True:
+                if curr is None:
+                        next = random.choice(dict.keys())
+                else:
+                        next = randNext(dict)
+                dict.pop(next, None)
+                cleanedNext = clean(next)
+                remainingLetters = removeWord(cleanedNext, letters)
+                if remainingLetters is not None: #the word fits in the list letters
+                        if len(remainingLetters) == 0: #base case: the word uses the last of the letters
+                                return next
+                        rest = createAnagram(remainingLetters, chain, next, recursion=recursion+1)
+                        if rest is not None: #found an anagram!
+                                return next + ' ' + rest
+                if len(dict) == 0:
+                        return None
 
 arFilename = 'already-reblogged.txt'
 createARFile = open(arFilename, 'a+')
@@ -145,6 +125,10 @@ while True:
                                 print 'Timed out'
                                 p.terminate()
                                 p.join()
+                        else:
+                                if p.exitcode != 0:
+                                        print 'anabot: process terminated with exit code %d' % p.exitcode
+                                        sys.exit(p.exitcode)
                 time.sleep(waitInterval)
         except SSLError:
                 print 'Connection error'
