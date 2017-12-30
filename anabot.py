@@ -90,9 +90,9 @@ def reblog(post, reblogComment):
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='published', comment='<em>' + reblogComment + '</em><br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
 
-'''Returns True if Ana was successful, False if she wasn't'''
+'''Returns True if Ana was successful, False if they weren't'''
 def ana(post):
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
@@ -100,11 +100,16 @@ def ana(post):
         if not 'body' in post:
                 print 'No body attribute'
                 return False
-        print post['body']
         postLetters = [c for c in post['body'].lower() if c.isalpha()]
-        if (len(postLetters) < postLimitShort) or (len(postLetters) > postLimitLong):
-                print 'Too short or long'
+        if len(postLetters) < postLimitShort:
+                print 'Too short'
                 return False
+        if len(postLetters) > postLimitLong:
+                print post['body'][:postLimitLong-1] + '...'
+                print 'Too long'
+                return False
+        else:
+                print post['body']
         
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
