@@ -122,8 +122,15 @@ def ana(post):
 
 try:
         client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
+        cinfo = client.info()
+        if (not cinfo) or ('errors' in cinfo):
+                print '!!! Could not authenticate user. !!!'
+                sys.exit(2)
+        print 'Authorization successful.'
 except:
         print '!!! Could not connect to Tumblr. !!!'
+        sys.exit(1)
+
 while True:
         tag = clean(random.choice(markovChain.keys()))
         print '===== Searching tag: ' + tag + ' ====='
