@@ -79,11 +79,18 @@ readARFile = open(arFilename, 'r')
 alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
 readARFile.close()
 
+tagBlacklistFilename = 'tag-blacklist.txt'
+tagBlacklistFile = open(tagBlacklistFilename, 'r')
+tagBlacklist = tagBlacklistFile.readlines()
+tagBlacklistFile.close()
+
+print 'Reading Markov data'
 markovChainFilename = 'mark.json'
 markovChainFile = open(markovChainFilename, 'r')
 markovChainJSON = markovChainFile.read()
 markovChainFile.close()
 markovChain = json.loads(markovChainJSON)
+print 'Done'
 
 def reblog(post, reblogComment):
         alreadyReblogged.append(post['id'])
@@ -97,6 +104,10 @@ def ana(post):
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
                 return False
+        for tag in post['tags']:
+                if tag in tagBlacklist:
+                        print 'Post tagged with #' + tag
+                        return False
         if not 'body' in post:
                 print 'No body attribute'
                 return False
@@ -121,6 +132,7 @@ def ana(post):
         return False
 
 try:
+        print 'Connecting to Tumblr'
         client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
         cinfo = client.info()
         if (not cinfo) or ('errors' in cinfo):
