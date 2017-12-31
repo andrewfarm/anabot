@@ -68,7 +68,7 @@ postLimitLong = 30
 timeout = 60
 waitInterval = 0
 
-version = '0.6'
+version = '0.7'
 
 print '===== Starting Anabot v' + version + ' ====='
 
@@ -104,24 +104,24 @@ def ana(post):
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
                 return False
-        for tag in post['tags']:
-                if tag in tagBlacklist:
-                        print 'Post tagged with #' + tag
-                        return False
         if not 'body' in post:
                 print 'No body attribute'
                 return False
         postLetters = [c for c in post['body'].lower() if c.isalpha()]
         if len(postLetters) < postLimitShort:
+                print post['body']
                 print 'Too short'
                 return False
         if len(postLetters) > postLimitLong:
                 print post['body'][:postLimitLong-1] + '...'
                 print 'Too long'
                 return False
-        else:
-                print post['body']
-        
+        for tag in post['tags']:
+                if tag.lower() in tagBlacklist:
+                        print 'Post tagged with #' + tag
+                        return False
+        print post['body']
+
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
                 reblog(post, anagram)
