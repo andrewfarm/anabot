@@ -68,7 +68,7 @@ postLimitLong = 30
 timeout = 60
 waitInterval = 0
 
-version = '0.7'
+version = '0.8'
 
 print '===== Starting Anabot v' + version + ' ====='
 
@@ -81,7 +81,7 @@ readARFile.close()
 
 tagBlacklistFilename = 'tag-blacklist.txt'
 tagBlacklistFile = open(tagBlacklistFilename, 'r')
-tagBlacklist = tagBlacklistFile.readlines()
+tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
 tagBlacklistFile.close()
 
 print 'Reading Markov data'
@@ -97,7 +97,7 @@ def reblog(post, reblogComment):
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=('anagram',), state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
 
 '''Returns True if Ana was successful, False if they weren't'''
 def ana(post):
@@ -117,9 +117,11 @@ def ana(post):
                 print 'Too long'
                 return False
         for tag in post['tags']:
-                if tag.lower() in tagBlacklist:
-                        print 'Post tagged with #' + tag
-                        return False
+                tag = tag.lower()
+                for blacklistedTag in tagBlacklist:
+                        if tag == blacklistedTag:
+                                print 'Post tagged with #' + tag
+                                return False
         print post['body']
 
         anagram = createAnagram(postLetters, markovChain)
