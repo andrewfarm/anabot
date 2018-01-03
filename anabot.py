@@ -115,6 +115,9 @@ def reblog(post, reblogComment):
 
 '''Returns True if Ana was successful, False if they weren't'''
 def ana(post):
+        if type(post) is not dict:
+                print 'Unexpected post format'
+                return False
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
                 return False
