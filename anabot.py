@@ -6,6 +6,7 @@ import json
 import re
 from multiprocessing import Process
 import time
+from requests.exceptions import ConnectionError
 from requests.exceptions import SSLError
 import sys
 from copy import deepcopy
@@ -36,7 +37,7 @@ def randNext(nextDict):
 def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
-def createAnagram(letters, chain, s1=None, s2=None, recursion=1):
+def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=False, soFar=None):
 #        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
         if (s1 is None) or (s2 is None):
                 dict = deepcopy(chain)
@@ -49,15 +50,28 @@ def createAnagram(letters, chain, s1=None, s2=None, recursion=1):
                         dict[nexts1].pop(next)
                         if len(dict[nexts1]) == 0:
                                 dict.pop(nexts1)
+                        if printCurr:
+                                nextSoFar = next
                 else:
                         nexts1 = s2
                         next = randNext(dict)
                         dict.pop(next)
+                        if printCurr:
+                                nextSoFar = soFar + ' ' + next
+                                sys.stdout.write("\033[K") #clear the console line
+                                print nextSoFar
+                                sys.stdout.write("\033[K") #clear the console line
+                                print 'Current chain length: %d' % (recursion - 1)
+                                sys.stdout.write("\033[F") #move cursor to start of last line
+                                sys.stdout.write("\033[F") #move cursor to start of last line
                 remainingLetters = removeWord(clean(next), letters)
                 if remainingLetters is not None: #the word fits in the list letters
                         if len(remainingLetters) == 0: #base case: the word uses the last of the letters
                                 return next
-                        rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion+1)
+                        if printCurr:
+                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion + 1, printCurr=True, soFar=nextSoFar)
+                        else:
+                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion + 1)
                         if rest is not None: #found an anagram!
                                 return next + ' ' + rest
                 if len(dict) == 0:
@@ -126,6 +140,7 @@ def ana(post):
 
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
+                anagram = anagram[0].upper() + anagram[1:]
                 reblog(post, anagram)
                 print anagram
                 return True
@@ -133,15 +148,35 @@ def ana(post):
         print '404 Anagram not found'
         return False
 
+if len(sys.argv) > 1:
+        if sys.argv[1] == '--text':
+                if len(sys.argv) > 2:
+                        anagram = createAnagram([c for c in sys.argv[2] if c.isalpha()], markovChain)
+                        if anagram is not None:
+                                anagram = anagram[0].upper() + anagram[1:]
+                                print 'Anagram found:'
+                                print anagram
+                        else:
+                                print 'No anagrams found.'
+                        sys.exit(0)
+                else:
+                        print 'Usage: anabot.py [-t <text>]'
+                        sys.exit(1)
+        else:
+                print 'Unknown option ' + sys.argv[1]
+                sys.exit(1)
+
 try:
         print 'Connecting to Tumblr'
         client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
         cinfo = client.info()
-        if (not cinfo) or ('errors' in cinfo):
+        if 'errors' in cinfo:
+                for error in cinfo['errors']:
+                        print 'Error: ' + error['title'] + ': ' + error['detail']
                 print '!!! Could not authenticate user. !!!'
                 sys.exit(2)
         print 'Authorization successful.'
-except:
+except ConnectionError:
         print '!!! Could not connect to Tumblr. !!!'
         sys.exit(1)
 
