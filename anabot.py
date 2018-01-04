@@ -39,10 +39,14 @@ def clean(symbol):
 
 def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=False, soFar=None):
 #        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
-        if (s1 is None) or (s2 is None):
-                dict = deepcopy(chain)
-        else:
-                dict = deepcopy(chain[s1][s2])
+        try:
+                if (s1 is None) or (s2 is None):
+                        dict = deepcopy(chain)
+                else:
+                        dict = deepcopy(chain[s1][s2])
+        except KeyError:
+                print 'Error with deepCopy (Unexpected KeyError)'
+                sys.exit(0) #any other exit code will cause Ana to exit
         while True:
                 if (s1 is None) or (s2 is None):
                         nexts1 = random.choice(dict.keys())
