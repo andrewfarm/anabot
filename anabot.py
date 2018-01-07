@@ -158,6 +158,7 @@ def ana(post):
 if len(sys.argv) > 1:
         if sys.argv[1] == '--text':
                 if len(sys.argv) > 2:
+                        print 'Creating anagram'
                         anagram = createAnagram([c for c in sys.argv[2] if c.isalpha()], markovChain)
                         if anagram is not None:
                                 anagram = anagram[0].upper() + anagram[1:]
@@ -201,8 +202,11 @@ while True:
                                 p.join()
                         else:
                                 if p.exitcode != 0:
-                                        print 'anabot: process terminated with exit code %d' % p.exitcode
-                                        sys.exit(p.exitcode)
+                                        if p.exitcode == -11:
+                                                print 'Error: unexpected segfault'
+                                        else:
+                                                print 'anabot: process terminated with exit code %d' % p.exitcode
+                                                sys.exit(p.exitcode)
                 time.sleep(waitInterval)
         except SSLError:
                 print 'Connection error'
