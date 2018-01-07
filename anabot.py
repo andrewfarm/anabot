@@ -11,6 +11,8 @@ from requests.exceptions import SSLError
 import sys
 from copy import deepcopy
 
+from stripogram import html2text
+
 '''Returns a copy of textLetters with the letters in word each removed once,
    or None if not all the letters in word exist in textLetters'''
 def removeWord(word, textLetters):
@@ -118,7 +120,7 @@ def reblog(post, reblogComment):
         client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
 
 '''Returns True if Ana was successful, False if they weren't'''
-def ana(post):
+def ana(post, bodyNeedsCleaning=False):
         if type(post) is not dict:
                 print 'Unexpected post format'
                 return False
@@ -128,13 +130,16 @@ def ana(post):
         if not 'body' in post:
                 print 'No body attribute'
                 return False
-        postLetters = [c for c in post['body'].lower() if c.isalpha()]
+        body = post['body']
+        if bodyNeedsCleaning:
+                body = html2text(body)
+        postLetters = [c for c in body.lower() if c.isalpha()]
         if len(postLetters) < postLimitShort:
-                print post['body']
+                print body
                 print 'Too short'
                 return False
         if len(postLetters) > postLimitLong:
-                print post['body'][:postLimitLong-1] + '...'
+                print body[:postLimitLong-1] + '...'
                 print 'Too long'
                 return False
         for tag in post['tags']:
@@ -143,7 +148,7 @@ def ana(post):
                         if tag == blacklistedTag:
                                 print 'Post tagged with #' + tag
                                 return False
-        print post['body']
+        print body
 
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
@@ -168,8 +173,10 @@ if len(sys.argv) > 1:
                                 print 'No anagrams found.'
                         sys.exit(0)
                 else:
-                        print 'Usage: anabot.py [-t <text>]'
+                        print 'Usage: anabot.py [--text <text>]'
                         sys.exit(1)
+        elif sys.argv[1] == '--post':
+                pass
         else:
                 print 'Unknown option ' + sys.argv[1]
                 sys.exit(1)
@@ -187,6 +194,23 @@ try:
 except ConnectionError:
         print '!!! Could not connect to Tumblr. !!!'
         sys.exit(1)
+
+if len(sys.argv) > 1:
+        if sys.argv[1] == '--post':
+                if len(sys.argv) > 3:
+                        response = client.posts(sys.argv[2] + '.tumblr.com', id=int(sys.argv[3]))
+                        if 'errors' in response:
+                                for error in response['errors']:
+                                        print 'Error: ' + error['title'] + ': ' + error['detail']
+                                sys.exit(1)
+                        ana(response['posts'][0], bodyNeedsCleaning=True)
+                        sys.exit(0)
+                else:
+                        print 'Usage: anabot.py [--post <blog> <post id>]'
+                        sys.exit(1)
+        else:
+                print 'Unknown option ' + sys.argv[1]
+                sys.exit(1)
 
 while True:
         tag = clean(random.choice(markovChain.keys()))
