@@ -217,6 +217,10 @@ while True:
         print '===== Searching tag: ' + tag + ' ====='
         try:
                 for post in client.tagged(tag, filter='text'):
+                        if 'errors' in post:
+                                for error in post['errors']:
+                                        print 'Error: ' + error['title'] + ': ' + error['detail']
+                                sys.exit(1)
                         p = Process(target=ana, name='Ana', args=(post,))
                         p.start()
                         p.join(timeout)
