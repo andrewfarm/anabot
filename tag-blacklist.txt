@@ -13,3 +13,5 @@ nsfw text
 vent
 rant
 delete
+depression
+ooc
