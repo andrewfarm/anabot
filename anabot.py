@@ -218,8 +218,12 @@ while True:
         try:
                 for post in client.tagged(tag, filter='text'):
                         if 'errors' in post:
-                                for error in post['errors']:
-                                        print 'Error: ' + error['title'] + ': ' + error['detail']
+                                if type(post) is dict:
+                                        for error in post['errors']:
+                                                print 'Error: ' + error['title'] + ': ' + error['detail']
+                                else:
+                                        print post
+                                        print 'Unknown error retrieving tagged posts'
                                 sys.exit(1)
                         p = Process(target=ana, name='Ana', args=(post,))
                         p.start()
