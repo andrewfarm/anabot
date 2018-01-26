@@ -3,3 +3,5 @@ already-reblogged.txt
 text*
 mark*.json
 keys.py
+stats*.json
+testing.py

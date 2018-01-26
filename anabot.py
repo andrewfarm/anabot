@@ -10,6 +10,7 @@ from requests.exceptions import ConnectionError
 from requests.exceptions import SSLError
 import sys
 from copy import deepcopy
+import os.path
 
 from stripogram import html2text
 
@@ -92,35 +93,48 @@ version = '0.8'
 
 print '===== Starting Anabot v' + version + ' ====='
 
-arFilename = 'already-reblogged.txt'
-createARFile = open(arFilename, 'a+')
-createARFile.close()
-readARFile = open(arFilename, 'r')
-alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
-readARFile.close()
-
-tagBlacklistFilename = 'tag-blacklist.txt'
-tagBlacklistFile = open(tagBlacklistFilename, 'r')
-tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
-tagBlacklistFile.close()
-
 print 'Reading Markov data'
 markovChainFilename = 'mark.json'
 markovChainFile = open(markovChainFilename, 'r')
-markovChainJSON = markovChainFile.read()
+markovChain = json.loads(markovChainFile.read())
 markovChainFile.close()
-markovChain = json.loads(markovChainJSON)
-print 'Done'
+print 'Done (%d unique symbols)' % len(markovChain)
 
-def reblog(post, reblogComment):
-        alreadyReblogged.append(post['id'])
+def saveAlreadyReblogged():
         appendARFile = open(arFilename, 'a+')
         appendARFile.write('%d\n' % post['id'])
         appendARFile.close()
+
+statsFilename = 'stats.json'
+stats = None
+
+def saveStats(stats):
+        writeStatsFile = open(statsFilename, 'w+')
+        writeStatsFile.write(json.dumps(stats))
+        writeStatsFile.close()
+
+def loadStats():
+        if os.path.exists(statsFilename):
+                readStatsFile = open(statsFilename, 'r')
+                stats = json.loads(readStatsFile.read())
+                readStatsFile.close()
+        else:
+                stats = {
+                        'postsSearched': 0,
+                        'postsWithBLTags': 0,
+                        'postsTried': 0,
+                        'postsAnagrammed': 0
+                }
+        return stats
+
+
+def reblog(post, reblogComment):
         client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
+        alreadyReblogged.append(post['id'])
+        saveAlreadyReblogged()
 
 '''Returns True if Ana was successful, False if they weren't'''
-def ana(post, bodyNeedsCleaning=False):
+def ana(post, stats=None, bodyNeedsCleaning=False):
         if type(post) is not dict:
                 print 'Unexpected post format'
                 return False
@@ -146,14 +160,23 @@ def ana(post, bodyNeedsCleaning=False):
                 tag = tag.lower()
                 for blacklistedTag in tagBlacklist:
                         if tag == blacklistedTag:
+                                if type(stats) is dict:
+                                        stats['postsWithBLTags'] += 1
+                                        saveStats(stats)
                                 print 'Post tagged with #' + tag
                                 return False
+        if type(stats) is dict:
+                stats['postsTried'] += 1
+                saveStats(stats)
         print body
 
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
                 anagram = anagram[0].upper() + anagram[1:]
                 reblog(post, anagram)
+                if type(stats) is dict:
+                        stats['postsAnagrammed'] += 1
+                        saveStats(stats)
                 print anagram
                 return True
 
@@ -180,6 +203,18 @@ if len(sys.argv) > 1:
         else:
                 print 'Unknown option ' + sys.argv[1]
                 sys.exit(1)
+
+arFilename = 'already-reblogged.txt'
+createARFile = open(arFilename, 'a+')
+createARFile.close()
+readARFile = open(arFilename, 'r')
+alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
+readARFile.close()
+
+tagBlacklistFilename = 'tag-blacklist.txt'
+tagBlacklistFile = open(tagBlacklistFilename, 'r')
+tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
+tagBlacklistFile.close()
 
 try:
         print 'Connecting to Tumblr'
@@ -217,6 +252,8 @@ while True:
         print '===== Searching tag: ' + tag + ' ====='
         try:
                 for post in client.tagged(tag, filter='text'):
+                        stats = loadStats()
+                        stats['postsSearched'] += 1
                         if 'errors' in post:
                                 if type(post) is dict:
                                         for error in post['errors']:
@@ -225,7 +262,7 @@ while True:
                                         print post
                                         print 'Unknown error retrieving tagged posts'
                                 sys.exit(1)
-                        p = Process(target=ana, name='Ana', args=(post,))
+                        p = Process(target=ana, name='Ana', args=(post,stats))
                         p.start()
                         p.join(timeout)
                         if p.is_alive():
@@ -239,6 +276,7 @@ while True:
                                         else:
                                                 print 'anabot: process terminated with exit code %d' % p.exitcode
                                                 sys.exit(p.exitcode)
+                saveStats(stats)
                 time.sleep(waitInterval)
         except SSLError:
                 print 'Connection error'
