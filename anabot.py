@@ -14,8 +14,149 @@ import os.path
 
 from stripogram import html2text
 
+POST_LIMIT_SHORT = 10
+POST_LIMIT_LONG = 30
+TIMEOUT = 60
+WAIT_INTERVAL = 0
+
+VERSION_STRING = '1.0'
+
+MARKOV_FILENAME = 'mark.json'
+AR_FILENAME = 'already-reblogged.txt'
+TAG_BLACKLIST_FILENAME = 'tag-blacklist.txt'
+STATS_FILENAME = 'stats.json'
+
+def checkAPIErrors(response):
+        if 'errors' in response:
+                if type(response) is dict:
+                        for error in post['errors']:
+                                print 'Error: ' + error['title'] + ': ' + error['detail']
+                else:
+                        print response
+                        print 'Unknown API error'
+                        sys.exit(1)
+
+def runText(text):
+        print 'Creating anagram'
+        markovChain = loadMarkovChain()
+        anagram = createAnagram([c for c in sys.argv[text] if c.isalpha()], markovChain)
+        if anagram is not None:
+                anagram = anagram[0].upper() + anagram[1:]
+                print 'Anagram found:'
+                print anagram
+        else:
+                print '404 Anagram not found'
+
+def runPost(client, url, postID):
+        response = client.posts(url + '.tumblr.com', id=postID)
+        checkAPIErrors(response)
+        with response as post:
+                if canTry(post):
+                        markovChain = loadMarkovChain()
+                        ana(response['posts'][0], bodyNeedsCleaning=True)
+
+'''Connects to Tumblr's REST API. If the connection is successful, returns a TumblrRestClient object. If not, prints an error message and exits. Throws ConnectionError'''
+def connect():
+        print 'Connecting to Tumblr'
+        client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
+        cinfo = client.info()
+        if 'errors' in cinfo:
+                for error in cinfo['errors']:
+                        print 'Error: ' + error['title'] + ': ' + error['detail']
+                print '!!! Could not authenticate user. !!!'
+                sys.exit(2)
+        print 'Authorization successful.'
+        return client
+
+def loadAlreadyReblogged():
+        if os.path.exists(AR_FILENAME):
+                readARFile = open(AR_FILENAME, 'r')
+                alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
+                readARFile.close()
+        else:
+                alreadyReblogged = []
+        return alreadyReblogged
+
+def saveAlreadyReblogged():
+        appendARFile = open(AR_FILENAME, 'a+')
+        appendARFile.write('%d\n' % post['id'])
+        appendARFile.close()
+
+def loadTagBlacklist():
+        tagBlacklistFile = open(TAG_BLACKLIST_FILENAME, 'r')
+        tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
+        tagBlacklistFile.close()
+        return tagBlacklist
+
+def loadStats():
+        if os.path.exists(STATS_FILENAME):
+                readStatsFile = open(STATS_FILENAME, 'r')
+                stats = json.loads(readStatsFile.read())
+                readStatsFile.close()
+        else:
+                stats = {
+                        'postsSearched': 0,
+                        'postsWithBLTags': 0,
+                        'postsTried': 0,
+                        'postsAnagrammed': 0
+                }
+        return stats
+
+def saveStats(stats):
+        writeStatsFile = open(STATS_FILENAME, 'w+')
+        writeStatsFile.write(json.dumps(stats))
+        writeStatsFile.close()
+
+def loadMarkovChain():
+        print 'Reading Markov data'
+        markovChainFile = open(MARKOV_FILENAME, 'r')
+        markovChain = json.loads(markovChainFile.read())
+        markovChainFile.close()
+        print 'Done (%d unique symbols)' % len(markovChain)
+        return markovChain
+
+'''Returns true if post is a dict object and has a 'body' attribute. Otherwise, prints an error message and returns false.'''
+def canTry(post):
+        if type(post) is not dict:
+                print 'Unexpected post format'
+                return False
+        if not 'body' in post:
+                print 'No body attribute'
+                return False
+        return True
+
+def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLong, stats=None):
+        if post['id'] in alreadyReblogged:
+                print 'Already reblogged'
+                return False
+        body = post['body']
+        postLetters = [c for c in body.lower() if c.isalpha()]
+        if len(postLetters) < postLimitShort:
+                print body
+                print 'Too short'
+                return False
+        if len(postLetters) > postLimitLong:
+                print body[:postLimitLong-1] + '...'
+                print 'Too long'
+                return False
+        for tag in post['tags']:
+                tag = tag.lower()
+                for blacklistedTag in tagBlacklist:
+                        if tag == blacklistedTag:
+                                if type(stats) is dict:
+                                        stats['postsWithBLTags'] += 1
+                                        saveStats(stats)
+                                print 'Post tagged with #' + tag
+                                return False
+        return True
+
+def reblog(post, reblogComment):
+        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + VERSION_STRING + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
+        alreadyReblogged.append(post['id'])
+        saveAlreadyReblogged()
+
 '''Returns a copy of textLetters with the letters in word each removed once,
-   or None if not all the letters in word exist in textLetters'''
+        or None if not all the letters in word exist in textLetters'''
 def removeWord(word, textLetters):
         textLetters = list(textLetters) #make a copy of the text
         for letter in word:
@@ -41,7 +182,7 @@ def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
 def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=False, soFar=None):
-#        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
+        #        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
         try:
                 if (s1 is None) or (s2 is None):
                         dict = deepcopy(chain)
@@ -84,90 +225,13 @@ def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=False
                 if len(dict) == 0:
                         return None
 
-postLimitShort = 10
-postLimitLong = 30
-timeout = 60
-waitInterval = 0
-
-version = '0.8'
-
-print '===== Starting Anabot v' + version + ' ====='
-
-print 'Reading Markov data'
-markovChainFilename = 'mark.json'
-markovChainFile = open(markovChainFilename, 'r')
-markovChain = json.loads(markovChainFile.read())
-markovChainFile.close()
-print 'Done (%d unique symbols)' % len(markovChain)
-
-def saveAlreadyReblogged():
-        appendARFile = open(arFilename, 'a+')
-        appendARFile.write('%d\n' % post['id'])
-        appendARFile.close()
-
-statsFilename = 'stats.json'
-stats = None
-
-def saveStats(stats):
-        writeStatsFile = open(statsFilename, 'w+')
-        writeStatsFile.write(json.dumps(stats))
-        writeStatsFile.close()
-
-def loadStats():
-        if os.path.exists(statsFilename):
-                readStatsFile = open(statsFilename, 'r')
-                stats = json.loads(readStatsFile.read())
-                readStatsFile.close()
-        else:
-                stats = {
-                        'postsSearched': 0,
-                        'postsWithBLTags': 0,
-                        'postsTried': 0,
-                        'postsAnagrammed': 0
-                }
-        return stats
-
-
-def reblog(post, reblogComment):
-        client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + version + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
-        alreadyReblogged.append(post['id'])
-        saveAlreadyReblogged()
-
 '''Returns True if Ana was successful, False if they weren't'''
-def ana(post, stats=None, bodyNeedsCleaning=False):
-        if type(post) is not dict:
-                print 'Unexpected post format'
-                return False
-        if post['id'] in alreadyReblogged:
-                print 'Already reblogged'
-                return False
-        if not 'body' in post:
-                print 'No body attribute'
-                return False
-        body = post['body']
-        if bodyNeedsCleaning:
-                body = html2text(body)
-        postLetters = [c for c in body.lower() if c.isalpha()]
-        if len(postLetters) < postLimitShort:
-                print body
-                print 'Too short'
-                return False
-        if len(postLetters) > postLimitLong:
-                print body[:postLimitLong-1] + '...'
-                print 'Too long'
-                return False
-        for tag in post['tags']:
-                tag = tag.lower()
-                for blacklistedTag in tagBlacklist:
-                        if tag == blacklistedTag:
-                                if type(stats) is dict:
-                                        stats['postsWithBLTags'] += 1
-                                        saveStats(stats)
-                                print 'Post tagged with #' + tag
-                                return False
+def ana(post, markovChain, stats=None, bodyNeedsCleaning=False):
         if type(stats) is dict:
                 stats['postsTried'] += 1
                 saveStats(stats)
+        body = post['body']
+        postLetters = [c for c in body.lower() if c.isalpha()]
         print body
 
         anagram = createAnagram(postLetters, markovChain)
@@ -177,106 +241,83 @@ def ana(post, stats=None, bodyNeedsCleaning=False):
                 if type(stats) is dict:
                         stats['postsAnagrammed'] += 1
                         saveStats(stats)
+                print 'Anagram found:'
                 print anagram
                 return True
-
+        
         print '404 Anagram not found'
         return False
 
+def runAnaProcess(post, markovChain, stats=None, bodyNeedsCleaning=False):
+        p = Process(target=ana, name='Ana', args=(post, markovChain, stats, bodyNeedsCleaning))
+        p.start()
+        p.join(TIMEOUT)
+        if p.is_alive():
+                print 'Timed out'
+                p.terminate()
+                p.join()
+        else:
+                if p.exitcode != 0:
+                        if p.exitcode == -11:
+                                print 'Error: unexpected segfault'
+                        else:
+                                print 'anabot: process terminated with exit code %d' % p.exitcode
+                                sys.exit(p.exitcode)
+        stats.update(loadStats())
+
+print '===== Starting Anabot v' + VERSION_STRING + ' ====='
+
+# check for command-line options
 if len(sys.argv) > 1:
         if sys.argv[1] == '--text':
                 if len(sys.argv) > 2:
-                        print 'Creating anagram'
-                        anagram = createAnagram([c for c in sys.argv[2] if c.isalpha()], markovChain)
-                        if anagram is not None:
-                                anagram = anagram[0].upper() + anagram[1:]
-                                print 'Anagram found:'
-                                print anagram
-                        else:
-                                print 'No anagrams found.'
+                        runText(sys.argv[2])
                         sys.exit(0)
                 else:
                         print 'Usage: anabot.py [--text <text>]'
                         sys.exit(1)
         elif sys.argv[1] == '--post':
-                pass
+                pass # will deal with this option later
         else:
                 print 'Unknown option ' + sys.argv[1]
                 sys.exit(1)
 
-arFilename = 'already-reblogged.txt'
-createARFile = open(arFilename, 'a+')
-createARFile.close()
-readARFile = open(arFilename, 'r')
-alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
-readARFile.close()
-
-tagBlacklistFilename = 'tag-blacklist.txt'
-tagBlacklistFile = open(tagBlacklistFilename, 'r')
-tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
-tagBlacklistFile.close()
-
+# all futher features require a Tumblr API client
+client = None
 try:
-        print 'Connecting to Tumblr'
-        client = pytumblr.TumblrRestClient(keys.consumerKey, keys.consumerSecret, keys.token, keys.tokenSecret)
-        cinfo = client.info()
-        if 'errors' in cinfo:
-                for error in cinfo['errors']:
-                        print 'Error: ' + error['title'] + ': ' + error['detail']
-                print '!!! Could not authenticate user. !!!'
-                sys.exit(2)
-        print 'Authorization successful.'
+        client = connect()
 except ConnectionError:
         print '!!! Could not connect to Tumblr. !!!'
         sys.exit(1)
 
+# handle rest of command-line options
 if len(sys.argv) > 1:
         if sys.argv[1] == '--post':
                 if len(sys.argv) > 3:
-                        response = client.posts(sys.argv[2] + '.tumblr.com', id=int(sys.argv[3]))
-                        if 'errors' in response:
-                                for error in response['errors']:
-                                        print 'Error: ' + error['title'] + ': ' + error['detail']
-                                sys.exit(1)
-                        ana(response['posts'][0], bodyNeedsCleaning=True)
+                        runPost(client, sys.argv[2], sys.argv[3])
                         sys.exit(0)
                 else:
                         print 'Usage: anabot.py [--post <blog> <post id>]'
                         sys.exit(1)
-        else:
-                print 'Unknown option ' + sys.argv[1]
-                sys.exit(1)
+
+# no command-line options (default behavior)
+
+markovChain = loadMarkovChain()
+alreadyReblogged = loadAlreadyReblogged()
+tagBlacklist = loadTagBlacklist()
+stats = loadStats()
 
 while True:
         tag = clean(random.choice(markovChain.keys()))
         print '===== Searching tag: ' + tag + ' ====='
         try:
-                for post in client.tagged(tag, filter='text'):
-                        stats = loadStats()
+                response = client.tagged(tag, filter='text')
+                checkAPIErrors(response)
+                for post in response:
                         stats['postsSearched'] += 1
-                        if 'errors' in post:
-                                if type(post) is dict:
-                                        for error in post['errors']:
-                                                print 'Error: ' + error['title'] + ': ' + error['detail']
-                                else:
-                                        print post
-                                        print 'Unknown error retrieving tagged posts'
-                                sys.exit(1)
-                        p = Process(target=ana, name='Ana', args=(post,stats))
-                        p.start()
-                        p.join(timeout)
-                        if p.is_alive():
-                                print 'Timed out'
-                                p.terminate()
-                                p.join()
-                        else:
-                                if p.exitcode != 0:
-                                        if p.exitcode == -11:
-                                                print 'Error: unexpected segfault'
-                                        else:
-                                                print 'anabot: process terminated with exit code %d' % p.exitcode
-                                                sys.exit(p.exitcode)
+                        if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, stats=stats):
+                                runAnaProcess(post, markovChain, stats=stats)
                 saveStats(stats)
-                time.sleep(waitInterval)
+                time.sleep(WAIT_INTERVAL)
         except SSLError:
                 print 'Connection error'
