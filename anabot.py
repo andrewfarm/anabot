@@ -9,7 +9,6 @@ import time
 from requests.exceptions import ConnectionError
 from requests.exceptions import SSLError
 import sys
-from copy import deepcopy
 import os.path
 
 from stripogram import html2text
@@ -19,7 +18,7 @@ POST_LIMIT_LONG = 30
 TIMEOUT = 60
 WAIT_INTERVAL = 0
 
-VERSION_STRING = '1.0'
+VERSION_STRING = '1.1'
 
 MARKOV_FILENAME = 'mark.json'
 AR_FILENAME = 'already-reblogged.txt'
@@ -166,63 +165,64 @@ def removeWord(word, textLetters):
                         return None
         return textLetters
 
-'''Chooses a random state from the states in nextDict based on their frequencies'''
-def randNext(nextDict):
-        totalFreq = 0
-        for next in nextDict:
-                totalFreq += nextDict[next]
-        rand = int(random.random() * totalFreq)
-        cumulativeFreq = 0
-        for next in nextDict:
-                cumulativeFreq += nextDict[next]
-                if cumulativeFreq >= rand:
-                        return next
+#'''Chooses a random state from the states in nextDict based on their frequencies'''
+#def randNext(nextDict):
+#        totalFreq = 0
+#        for next in nextDict:
+#                totalFreq += nextDict[next]
+#        rand = int(random.random() * totalFreq)
+#        cumulativeFreq = 0
+#        for next in nextDict:
+#                cumulativeFreq += nextDict[next]
+#                if cumulativeFreq >= rand:
+#                        return next
 
 def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
-def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=False, soFar=None):
+#def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=True, soFar=None):
+def createAnagram(letters, chain, s1=None, s2=None):
         #        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
         try:
                 if (s1 is None) or (s2 is None):
-                        dict = deepcopy(chain)
+                        symbols = chain
                 else:
-                        dict = deepcopy(chain[s1][s2])
-        except KeyError:
-                print 'Error with deepCopy (Unexpected KeyError)'
+                        symbols = chain[s1][s2].copy() #copy the dictionary of possible next symbols
+        except KeyError as ke:
+                print 'KeyError: ' + str(ke)
                 sys.exit(0) #any other exit code will cause Ana to exit
         while True:
                 if (s1 is None) or (s2 is None):
-                        nexts1 = random.choice(dict.keys())
-                        next = random.choice(dict[nexts1].keys())
-                        dict[nexts1].pop(next)
-                        if len(dict[nexts1]) == 0:
-                                dict.pop(nexts1)
-                        if printCurr:
-                                nextSoFar = next
+                        nexts1 = random.choice(symbols.keys())
+                        nexts2 = random.choice(symbols[nexts1].keys())
+
+#                        if printCurr: #debug
+#                                nextSoFar = nexts2
                 else:
                         nexts1 = s2
-                        next = randNext(dict)
-                        dict.pop(next)
-                        if printCurr:
-                                nextSoFar = soFar + ' ' + next
-                                sys.stdout.write("\033[K") #clear the console line
-                                print nextSoFar
-                                sys.stdout.write("\033[K") #clear the console line
-                                print 'Current chain length: %d' % (recursion - 1)
-                                sys.stdout.write("\033[F") #move cursor to start of last line
-                                sys.stdout.write("\033[F") #move cursor to start of last line
-                remainingLetters = removeWord(clean(next), letters)
+                        nexts2 = random.choice(symbols.keys())
+                        symbols.pop(nexts2)
+
+#                        if printCurr: #debug
+#                                nextSoFar = soFar + ' ' + nexts2
+#                                sys.stdout.write("\033[K") #clear the console line
+#                                print nextSoFar
+#                                sys.stdout.write("\033[K") #clear the console line
+#                                print 'Current chain length: %d' % (recursion - 1)
+#                                sys.stdout.write("\033[F") #move cursor to start of last line
+#                                sys.stdout.write("\033[F") #move cursor to start of last line
+                remainingLetters = removeWord(clean(nexts2), letters)
                 if remainingLetters is not None: #the word fits in the list letters
                         if len(remainingLetters) == 0: #base case: the word uses the last of the letters
-                                return next
-                        if printCurr:
-                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion + 1, printCurr=True, soFar=nextSoFar)
-                        else:
-                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=next, recursion=recursion + 1)
+                                return nexts2
+#                        if printCurr: #debug
+#                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2, recursion=recursion + 1, printCurr=True, soFar=nextSoFar)
+#                        else:
+#                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2, recursion=recursion + 1)
+                        rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2)
                         if rest is not None: #found an anagram!
-                                return next + ' ' + rest
-                if len(dict) == 0:
+                                return nexts2 + ' ' + rest
+                if len(symbols) == 0:
                         return None
 
 '''Returns True if Ana was successful, False if they weren't'''
