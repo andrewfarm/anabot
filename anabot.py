@@ -94,6 +94,7 @@ def loadStats():
                 readStatsFile.close()
         else:
                 stats = {
+                        'tagsSearched': 0,
                         'postsSearched': 0,
                         'postsWithBLTags': 0,
                         'postsTried': 0,
@@ -313,6 +314,7 @@ while True:
         try:
                 response = client.tagged(tag, filter='text')
                 checkAPIErrors(response)
+                stats['tagsSearched'] += 1
                 for post in response:
                         stats['postsSearched'] += 1
                         if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, stats=stats):
