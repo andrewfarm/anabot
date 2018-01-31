@@ -25,6 +25,8 @@ AR_FILENAME = 'already-reblogged.txt'
 TAG_BLACKLIST_FILENAME = 'tag-blacklist.txt'
 STATS_FILENAME = 'stats.json'
 
+debug = False
+
 def checkAPIErrors(response):
         if 'errors' in response:
                 if type(response) is dict:
@@ -35,10 +37,10 @@ def checkAPIErrors(response):
                         print 'Unknown API error'
                         sys.exit(1)
 
-def runText(text):
-        print 'Creating anagram'
+def runTextMode(text):
         markovChain = loadMarkovChain()
-        anagram = createAnagram([c for c in sys.argv[text] if c.isalpha()], markovChain)
+        print 'Creating anagram for "' + text + '"'
+        anagram = createAnagram([c for c in text if c.isalpha()], markovChain)
         if anagram is not None:
                 anagram = anagram[0].upper() + anagram[1:]
                 print 'Anagram found:'
@@ -46,7 +48,7 @@ def runText(text):
         else:
                 print '404 Anagram not found'
 
-def runPost(client, url, postID):
+def runPostMode(client, url, postID):
         response = client.posts(url + '.tumblr.com', id=postID)
         checkAPIErrors(response)
         with response as post:
@@ -181,8 +183,8 @@ def removeWord(word, textLetters):
 def clean(symbol):
         return ''.join([l for l in symbol.lower() if l.isalpha()])
 
-#def createAnagram(letters, chain, s1=None, s2=None, recursion=1, printCurr=True, soFar=None):
-def createAnagram(letters, chain, s1=None, s2=None):
+def createAnagram(letters, chain, s1=None, s2=None, recursion=1, soFar=None):
+#def createAnagram(letters, chain, s1=None, s2=None):
         #        print 'createAnagram(<letters>, <chain>, s1=\'%s\', s2=\'%s\', recursion=%d' % (s1, s2, recursion)
         try:
                 if (s1 is None) or (s2 is None):
@@ -197,30 +199,30 @@ def createAnagram(letters, chain, s1=None, s2=None):
                         nexts1 = random.choice(symbols.keys())
                         nexts2 = random.choice(symbols[nexts1].keys())
 
-#                        if printCurr: #debug
-#                                nextSoFar = nexts2
+                        if debug:
+                                nextSoFar = nexts2
                 else:
                         nexts1 = s2
                         nexts2 = random.choice(symbols.keys())
                         symbols.pop(nexts2)
 
-#                        if printCurr: #debug
-#                                nextSoFar = soFar + ' ' + nexts2
-#                                sys.stdout.write("\033[K") #clear the console line
-#                                print nextSoFar
-#                                sys.stdout.write("\033[K") #clear the console line
-#                                print 'Current chain length: %d' % (recursion - 1)
-#                                sys.stdout.write("\033[F") #move cursor to start of last line
-#                                sys.stdout.write("\033[F") #move cursor to start of last line
+                        if debug:
+                                nextSoFar = soFar + ' ' + nexts2
+                                sys.stdout.write("\033[K") #clear the console line
+                                print nextSoFar
+                                sys.stdout.write("\033[K") #clear the console line
+                                print 'Current chain length: %d' % (recursion - 1)
+                                sys.stdout.write("\033[F") #move cursor to start of last line
+                                sys.stdout.write("\033[F") #move cursor to start of last line
                 remainingLetters = removeWord(clean(nexts2), letters)
                 if remainingLetters is not None: #the word fits in the list letters
                         if len(remainingLetters) == 0: #base case: the word uses the last of the letters
                                 return nexts2
-#                        if printCurr: #debug
-#                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2, recursion=recursion + 1, printCurr=True, soFar=nextSoFar)
-#                        else:
-#                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2, recursion=recursion + 1)
-                        rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2)
+                        if debug:
+                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2, recursion=recursion + 1, soFar=nextSoFar)
+                        else:
+                                rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2)
+#                        rest = createAnagram(remainingLetters, chain, s1=nexts1, s2=nexts2)
                         if rest is not None: #found an anagram!
                                 return nexts2 + ' ' + rest
                 if len(symbols) == 0:
@@ -269,19 +271,46 @@ def runAnaProcess(post, markovChain, stats=None, bodyNeedsCleaning=False):
 print '===== Starting Anabot v' + VERSION_STRING + ' ====='
 
 # check for command-line options
-if len(sys.argv) > 1:
-        if sys.argv[1] == '--text':
-                if len(sys.argv) > 2:
-                        runText(sys.argv[2])
-                        sys.exit(0)
-                else:
-                        print 'Usage: anabot.py [--text <text>]'
+# there is probably a more compact way of writing this - but it will do for now
+argc = len(sys.argv)
+mode = None #default
+modeParams = []
+i = 1
+while i < argc:
+        opt = sys.argv[i]
+        if opt == '--text':
+                if mode is not None:
+                        print 'mode cannot be both \'' + mode + '\' and \'text\''
                         sys.exit(1)
-        elif sys.argv[1] == '--post':
-                pass # will deal with this option later
+                if i + 1 >= argc:
+                        print 'Usage: anabot.py --text <text to anagram>'
+                        sys.exit(1)
+                mode = 'text'
+                modeParams.append(sys.argv[i + 1])
+                i += 1
+        elif opt == '--post':
+                if mode is not None:
+                        print 'mode cannot be both \'' + mode + '\' and \'post\''
+                        sys.exit(1)
+                if i + 2 >= argc:
+                        print 'Usage: anabot.py --post <blog url> <post ID>'
+                        sys.exit(1)
+                mode = 'post'
+                modeParams.append(sys.argv[i + 1])
+                modeParams.append(sys.argv[i + 2])
+                i += 2
+        elif opt == '-d':
+                debug = True
         else:
-                print 'Unknown option ' + sys.argv[1]
+                print 'Unknown option ' + sys.argv[i]
                 sys.exit(1)
+        i += 1
+
+# run in text mode
+if mode == 'text':
+        print 'Running in offline (text-only) mode'
+        runTextMode(modeParams[0])
+        sys.exit(0)
 
 # all futher features require a Tumblr API client
 client = None
@@ -291,15 +320,11 @@ except ConnectionError:
         print '!!! Could not connect to Tumblr. !!!'
         sys.exit(1)
 
-# handle rest of command-line options
-if len(sys.argv) > 1:
-        if sys.argv[1] == '--post':
-                if len(sys.argv) > 3:
-                        runPost(client, sys.argv[2], sys.argv[3])
-                        sys.exit(0)
-                else:
-                        print 'Usage: anabot.py [--post <blog> <post id>]'
-                        sys.exit(1)
+# run in post mode
+if mode == 'post':
+        print 'Running on post %d from %s.tumblr.com' % (modeParams[1], modeParams[0])
+        runPostMode(client, sys.argv[2], sys.argv[3])
+        sys.exit(0)
 
 # no command-line options (default behavior)
 
