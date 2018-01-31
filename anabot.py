@@ -10,15 +10,14 @@ from requests.exceptions import ConnectionError
 from requests.exceptions import SSLError
 import sys
 import os.path
-
-from stripogram import html2text
+from bs4 import BeautifulSoup
 
 POST_LIMIT_SHORT = 10
 POST_LIMIT_LONG = 30
 TIMEOUT = 60
 WAIT_INTERVAL = 0
 
-VERSION_STRING = '1.1'
+VERSION_STRING = '1.2'
 
 MARKOV_FILENAME = 'mark.json'
 AR_FILENAME = 'already-reblogged.txt'
@@ -49,12 +48,33 @@ def runTextMode(text):
                 print '404 Anagram not found'
 
 def runPostMode(client, url, postID):
-        response = client.posts(url + '.tumblr.com', id=postID)
+        response = client.posts(url, id=postID)
         checkAPIErrors(response)
         with response as post:
                 if canTry(post):
                         markovChain = loadMarkovChain()
                         ana(response['posts'][0], bodyNeedsCleaning=True)
+
+def runBlogMode(client, url):
+        batchSize = 20
+        offset = 0
+        response = client.posts(url, offset=offset)
+        checkAPIErrors(response)
+        
+        markovChain = loadMarkovChain()
+        alreadyReblogged = loadAlreadyReblogged()
+        tagBlacklist = loadTagBlacklist()
+        
+        while len(response['posts']) > 0:
+                try:
+                        for post in response['posts']:
+                                if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
+                                        runAnaProcess(post, markovChain, alreadyReblogged, bodyNeedsCleaning=True)
+                except SSLError:
+                        print 'Connection error'
+                offset += batchSize
+                response = client.posts(url, offset=offset)
+                checkAPIErrors(response)
 
 '''Connects to Tumblr's REST API. If the connection is successful, returns a TumblrRestClient object. If not, prints an error message and exits. Throws ConnectionError'''
 def connect():
@@ -78,9 +98,9 @@ def loadAlreadyReblogged():
                 alreadyReblogged = []
         return alreadyReblogged
 
-def saveAlreadyReblogged():
+def saveAlreadyReblogged(postID):
         appendARFile = open(AR_FILENAME, 'a+')
-        appendARFile.write('%d\n' % post['id'])
+        appendARFile.write('%d\n' % postID)
         appendARFile.close()
 
 def loadTagBlacklist():
@@ -127,12 +147,27 @@ def canTry(post):
                 return False
         return True
 
-def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLong, stats=None):
+def lastParagraph(text):
+        ptags = BeautifulSoup(text, 'html.parser').find_all('p')
+        if len(ptags) == 0:
+                return None
+        else:
+                return ptags[-1].get_text()
+
+def getLetters(text):
+        return [c for c in text.lower() if c.isalpha()]
+
+def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLong, bodyNeedsCleaning=False, stats=None):
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
                 return False
         body = post['body']
-        postLetters = [c for c in body.lower() if c.isalpha()]
+        if bodyNeedsCleaning:
+                body = lastParagraph(body)
+                if body is None:
+                        print 'No paragraph tags found'
+                        return False
+        postLetters = getLetters(body)
         if len(postLetters) < postLimitShort:
                 print body
                 print 'Too short'
@@ -154,8 +189,6 @@ def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLon
 
 def reblog(post, reblogComment):
         client.reblog('anagram-robot.tumblr.com', id=post['id'], reblog_key=post['reblog_key'], tags=['anagram'], state='queue', comment=reblogComment + '<br><br><small>- Anagram robot ' + VERSION_STRING + '. I find anagrams for stuff. I know I don\'t always make sense, but I\'m getting better!</small>')
-        alreadyReblogged.append(post['id'])
-        saveAlreadyReblogged()
 
 '''Returns a copy of textLetters with the letters in word each removed once,
         or None if not all the letters in word exist in textLetters'''
@@ -229,18 +262,24 @@ def createAnagram(letters, chain, s1=None, s2=None, recursion=1, soFar=None):
                         return None
 
 '''Returns True if Ana was successful, False if they weren't'''
-def ana(post, markovChain, stats=None, bodyNeedsCleaning=False):
+def ana(post, markovChain, alreadyReblogged, stats=None, bodyNeedsCleaning=False):
         if type(stats) is dict:
                 stats['postsTried'] += 1
                 saveStats(stats)
         body = post['body']
-        postLetters = [c for c in body.lower() if c.isalpha()]
+        if bodyNeedsCleaning:
+                body = lastParagraph(body)
+                if body is None:
+                        print 'ana: could not clean body HTML (no paragraph tags found)'
+                        return False
+        postLetters = getLetters(body)
         print body
 
         anagram = createAnagram(postLetters, markovChain)
         if anagram is not None:
                 anagram = anagram[0].upper() + anagram[1:]
                 reblog(post, anagram)
+                saveAlreadyReblogged(post['id'])
                 if type(stats) is dict:
                         stats['postsAnagrammed'] += 1
                         saveStats(stats)
@@ -251,8 +290,8 @@ def ana(post, markovChain, stats=None, bodyNeedsCleaning=False):
         print '404 Anagram not found'
         return False
 
-def runAnaProcess(post, markovChain, stats=None, bodyNeedsCleaning=False):
-        p = Process(target=ana, name='Ana', args=(post, markovChain, stats, bodyNeedsCleaning))
+def runAnaProcess(post, markovChain, alreadyReblogged, stats=None, bodyNeedsCleaning=False):
+        p = Process(target=ana, name='Ana', args=(post, markovChain, alreadyReblogged, stats, bodyNeedsCleaning))
         p.start()
         p.join(TIMEOUT)
         if p.is_alive():
@@ -266,7 +305,9 @@ def runAnaProcess(post, markovChain, stats=None, bodyNeedsCleaning=False):
                         else:
                                 print 'anabot: process terminated with exit code %d' % p.exitcode
                                 sys.exit(p.exitcode)
-        stats.update(loadStats())
+        alreadyReblogged = loadAlreadyReblogged()
+        if type(stats) is dict:
+                stats.update(loadStats())
 
 print '===== Starting Anabot v' + VERSION_STRING + ' ====='
 
@@ -299,6 +340,16 @@ while i < argc:
                 modeParams.append(sys.argv[i + 1])
                 modeParams.append(sys.argv[i + 2])
                 i += 2
+        elif opt == '--blog':
+                if mode is not None:
+                        print 'mode cannot be both \'' + mode + '\' and \'blog\''
+                        sys.exit(1)
+                if i + 1 >= argc:
+                        print 'Usage: anabot.py --blog <blog url>'
+                        sys.exit(1)
+                mode = 'blog'
+                modeParams.append(sys.argv[i + 1])
+                i += 1
         elif opt == '-d':
                 debug = True
         else:
@@ -323,7 +374,13 @@ except ConnectionError:
 # run in post mode
 if mode == 'post':
         print 'Running on post %d from %s.tumblr.com' % (modeParams[1], modeParams[0])
-        runPostMode(client, sys.argv[2], sys.argv[3])
+        runPostMode(client, modeParams[0], modeParams[1])
+        sys.exit(0)
+
+# run in blog mode
+if mode == 'blog':
+        print 'Searching %s.tumblr.com' % modeParams[0]
+        runBlogMode(client, modeParams[0])
         sys.exit(0)
 
 # no command-line options (default behavior)
@@ -343,7 +400,7 @@ while True:
                 for post in response:
                         stats['postsSearched'] += 1
                         if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, stats=stats):
-                                runAnaProcess(post, markovChain, stats=stats)
+                                runAnaProcess(post, markovChain, alreadyReblogged, stats=stats)
                 saveStats(stats)
                 time.sleep(WAIT_INTERVAL)
         except SSLError:
