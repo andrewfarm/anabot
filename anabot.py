@@ -55,6 +55,12 @@ def runPostMode(client, url, postID):
                         markovChain = loadMarkovChain()
                         ana(response['posts'][0], bodyNeedsCleaning=True)
 
+def isOriginal(textpost):
+        #TODO currently returns false for posts without a trail attribute (e.g. chat posts) or with an empty trail list
+        return (('trail' in textpost) and
+                (len(textpost['trail']) > 0) and
+                ('is_current_item' in textpost['trail'][0]))
+
 def runBlogMode(client, url):
         batchSize = 20
         offset = 0
@@ -68,7 +74,7 @@ def runBlogMode(client, url):
         while len(response['posts']) > 0:
                 try:
                         for post in response['posts']:
-                                if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
+                                if canTry(post) and isOriginal(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
                                         runAnaProcess(post, markovChain, alreadyReblogged, bodyNeedsCleaning=True)
                 except SSLError:
                         print 'Connection error'
@@ -337,7 +343,7 @@ while i < argc:
                         print 'Usage: anabot.py --post <blog url> <post ID>'
                         sys.exit(1)
                 mode = 'post'
-                modeParams.append(sys.argv[i + 1])
+                modeParams.append(sys.argv[i + 1].lower())
                 modeParams.append(sys.argv[i + 2])
                 i += 2
         elif opt == '--blog':
@@ -348,7 +354,7 @@ while i < argc:
                         print 'Usage: anabot.py --blog <blog url>'
                         sys.exit(1)
                 mode = 'blog'
-                modeParams.append(sys.argv[i + 1])
+                modeParams.append(sys.argv[i + 1].lower())
                 i += 1
         elif opt == '-d':
                 debug = True
