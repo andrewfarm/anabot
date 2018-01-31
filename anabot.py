@@ -50,10 +50,9 @@ def runTextMode(text):
 def runPostMode(client, url, postID):
         response = client.posts(url, id=postID)
         checkAPIErrors(response)
-        with response as post:
-                if canTry(post):
-                        markovChain = loadMarkovChain()
-                        ana(response['posts'][0], bodyNeedsCleaning=True)
+        if canTry(response):
+                markovChain = loadMarkovChain()
+                ana(response['posts'][0], bodyNeedsCleaning=True)
 
 def isOriginal(textpost):
         #TODO currently returns false for posts without a trail attribute (e.g. chat posts) or with an empty trail list
@@ -344,7 +343,7 @@ while i < argc:
                         sys.exit(1)
                 mode = 'post'
                 modeParams.append(sys.argv[i + 1].lower())
-                modeParams.append(sys.argv[i + 2])
+                modeParams.append(int(sys.argv[i + 2]))
                 i += 2
         elif opt == '--blog':
                 if mode is not None:
