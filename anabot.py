@@ -184,7 +184,7 @@ def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLon
         for tag in post['tags']:
                 tag = tag.lower()
                 for blacklistedTag in tagBlacklist:
-                        if tag == blacklistedTag:
+                        if blacklistedTag in tag:
                                 if type(stats) is dict:
                                         stats['postsWithBLTags'] += 1
                                         saveStats(stats)
