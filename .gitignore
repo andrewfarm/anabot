@@ -5,3 +5,5 @@ mark*.json
 keys.py
 stats*.json
 testing.py
+chat.py
+loadmutil.py

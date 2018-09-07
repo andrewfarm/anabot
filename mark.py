@@ -41,10 +41,14 @@ def mark(filenames):
         outf = open('mark.json', 'w+')
         outf.write(json.dumps(chain))
         outf.close()
+        print 'Done (%d unique symbols)' % len(chain)
 
 if len(sys.argv) > 1:
         dir = sys.argv[1]
 else:
         dir = 'text'
-filenames = [join(dir, f) for f in listdir(dir) if isfile(join(dir, f))]
+if isfile(dir):
+        filenames = [dir]
+else:
+        filenames = [join(dir, f) for f in listdir(dir) if isfile(join(dir, f))]
 mark(filenames)
