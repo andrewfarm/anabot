@@ -22,6 +22,7 @@ VERSION_STRING = '1.2'
 MARKOV_FILENAME = 'mark.json'
 AR_FILENAME = 'already-reblogged.txt'
 TAG_BLACKLIST_FILENAME = 'tag-blacklist.txt'
+BLOG_BLACKLIST_FILENAME = 'blog-blacklist.txt'
 STATS_FILENAME = 'stats.json'
 
 debug = False
@@ -55,9 +56,9 @@ def runPostMode(client, url, postID):
                 return
         post = response['posts'][0]
         if canTry(post):
-#                if not shouldTry(post, [], loadTagBlacklist(), POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
-#                        print 'shouldTry failed'
-#                        return
+                if not shouldTry(post, [], loadTagBlacklist(), loadBlogBlacklist(), POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
+                        print 'shouldTry failed'
+                        return
                 markovChain = loadMarkovChain()
                 ana(post, markovChain, bodyNeedsCleaning=True)
 
@@ -76,11 +77,12 @@ def runBlogMode(client, url):
         markovChain = loadMarkovChain()
         alreadyReblogged = loadAlreadyReblogged()
         tagBlacklist = loadTagBlacklist()
+        blogBlacklist = loadBlogBlacklist()
         
         while len(response['posts']) > 0:
                 try:
                         for post in response['posts']:
-                                if canTry(post) and isOriginal(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
+                                if canTry(post) and isOriginal(post) and shouldTry(post, alreadyReblogged, tagBlacklist, blogBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
                                         runAnaProcess(post, markovChain, alreadyReblogged, bodyNeedsCleaning=True)
                 except SSLError:
                         print 'Connection error'
@@ -101,14 +103,22 @@ def connect():
         print 'Authorization successful.'
         return client
 
+def loadStringListFromFile(filename):
+        contentsList = []
+        if os.path.exists(filename):
+            readFile = open(filename, 'r')
+            contentsList = [line.strip() for line in readFile.readlines()]
+            return contentsList
+
+def loadIntListFromFile(filename):
+        contentsList = []
+        if os.path.exists(filename):
+                readFile = open(filename, 'r')
+                contentsList = [int(line.strip()) for line in readFile.readlines()]
+        return contentsList
+
 def loadAlreadyReblogged():
-        if os.path.exists(AR_FILENAME):
-                readARFile = open(AR_FILENAME, 'r')
-                alreadyReblogged = [int(line.strip()) for line in readARFile.readlines()]
-                readARFile.close()
-        else:
-                alreadyReblogged = []
-        return alreadyReblogged
+        return loadIntListFromFile(AR_FILENAME)
 
 def saveAlreadyReblogged(postID):
         appendARFile = open(AR_FILENAME, 'a+')
@@ -116,10 +126,10 @@ def saveAlreadyReblogged(postID):
         appendARFile.close()
 
 def loadTagBlacklist():
-        tagBlacklistFile = open(TAG_BLACKLIST_FILENAME, 'r')
-        tagBlacklist = [line.strip() for line in tagBlacklistFile.readlines()]
-        tagBlacklistFile.close()
-        return tagBlacklist
+        return loadStringListFromFile(TAG_BLACKLIST_FILENAME)
+
+def loadBlogBlacklist():
+        return loadStringListFromFile(BLOG_BLACKLIST_FILENAME)
 
 def loadStats():
         if os.path.exists(STATS_FILENAME):
@@ -171,10 +181,22 @@ def lastParagraph(text):
 def getLetters(text):
         return [c for c in text.lower() if c.isalpha()]
 
-def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLong, bodyNeedsCleaning=False, stats=None):
+def shouldTry(post, alreadyReblogged, tagBlacklist, blogBlacklist, postLimitShort, postLimitLong, bodyNeedsCleaning=False, stats=None):
         if post['id'] in alreadyReblogged:
                 print 'Already reblogged'
                 return False
+        if post['blog_name'] in blogBlacklist:
+                print 'Posted by ' + post['blog_name']
+                return False
+        for tag in post['tags']:
+                tag = tag.lower()
+                for blacklistedTag in tagBlacklist:
+                        if blacklistedTag in tag:
+                                if type(stats) is dict:
+                                        stats['postsWithBLTags'] += 1
+                                        saveStats(stats)
+                                print 'Post tagged with #' + tag
+                                return False
         body = post['body']
         if bodyNeedsCleaning:
                 body = lastParagraph(body)
@@ -190,15 +212,6 @@ def shouldTry(post, alreadyReblogged, tagBlacklist, postLimitShort, postLimitLon
                 print body[:postLimitLong-1] + '...'
                 print 'Too long'
                 return False
-        for tag in post['tags']:
-                tag = tag.lower()
-                for blacklistedTag in tagBlacklist:
-                        if blacklistedTag in tag:
-                                if type(stats) is dict:
-                                        stats['postsWithBLTags'] += 1
-                                        saveStats(stats)
-                                print 'Post tagged with #' + tag
-                                return False
         return True
 
 def reblog(post, reblogComment):
@@ -402,6 +415,7 @@ if mode == 'blog':
 markovChain = loadMarkovChain()
 alreadyReblogged = loadAlreadyReblogged()
 tagBlacklist = loadTagBlacklist()
+blogBlacklist = loadBlogBlacklist()
 stats = loadStats()
 
 while True:
@@ -413,7 +427,7 @@ while True:
                 stats['tagsSearched'] += 1
                 for post in response:
                         stats['postsSearched'] += 1
-                        if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, stats=stats):
+                        if canTry(post) and shouldTry(post, alreadyReblogged, tagBlacklist, blogBlacklist, POST_LIMIT_SHORT, POST_LIMIT_LONG, stats=stats):
                                 runAnaProcess(post, markovChain, alreadyReblogged, stats=stats)
                 saveStats(stats)
                 time.sleep(WAIT_INTERVAL)
