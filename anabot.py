@@ -50,9 +50,16 @@ def runTextMode(text):
 def runPostMode(client, url, postID):
         response = client.posts(url, id=postID)
         checkAPIErrors(response)
-        if canTry(response):
+        if (not 'posts' in response) or (len(response['posts']) == 0):
+                print 'Post not found'
+                return
+        post = response['posts'][0]
+        if canTry(post):
+#                if not shouldTry(post, [], loadTagBlacklist(), POST_LIMIT_SHORT, POST_LIMIT_LONG, bodyNeedsCleaning=True):
+#                        print 'shouldTry failed'
+#                        return
                 markovChain = loadMarkovChain()
-                ana(response['posts'][0], bodyNeedsCleaning=True)
+                ana(post, markovChain, bodyNeedsCleaning=True)
 
 def isOriginal(textpost):
         #TODO currently returns false for posts without a trail attribute (e.g. chat posts) or with an empty trail list
@@ -148,6 +155,8 @@ def canTry(post):
                 print 'Unexpected post format'
                 return False
         if not 'body' in post:
+                if debug:
+                        pprint(post)
                 print 'No body attribute'
                 return False
         return True
@@ -267,7 +276,7 @@ def createAnagram(letters, chain, s1=None, s2=None, recursion=1, soFar=None):
                         return None
 
 '''Returns True if Ana was successful, False if they weren't'''
-def ana(post, markovChain, alreadyReblogged, stats=None, bodyNeedsCleaning=False):
+def ana(post, markovChain, stats=None, bodyNeedsCleaning=False):
         if type(stats) is dict:
                 stats['postsTried'] += 1
                 saveStats(stats)
@@ -296,7 +305,7 @@ def ana(post, markovChain, alreadyReblogged, stats=None, bodyNeedsCleaning=False
         return False
 
 def runAnaProcess(post, markovChain, alreadyReblogged, stats=None, bodyNeedsCleaning=False):
-        p = Process(target=ana, name='Ana', args=(post, markovChain, alreadyReblogged, stats, bodyNeedsCleaning))
+        p = Process(target=ana, name='Ana', args=(post, markovChain, stats, bodyNeedsCleaning))
         p.start()
         p.join(TIMEOUT)
         if p.is_alive():
