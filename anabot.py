@@ -17,7 +17,7 @@ POST_LIMIT_LONG = 30
 TIMEOUT = 60
 WAIT_INTERVAL = 0
 
-VERSION_STRING = '1.2'
+VERSION_STRING = '1.3'
 
 MARKOV_FILENAME = 'mark.json'
 AR_FILENAME = 'already-reblogged.txt'
